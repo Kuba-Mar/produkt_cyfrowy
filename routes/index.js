@@ -9,27 +9,15 @@ const router = express.Router();
 const JWT_SECRET = 'your_jwt_secret_key';
 
 // --- Auth Endpoints ---
-// router.post('/auth/register', async (req, res) => {
-//   try {
-//     const { email, haslo, grupa_wiekowa } = req.body;
-//     const hashedPassword = await bcrypt.hash(haslo, 10);
-//     const newUser = await User.create({ email, haslo: hashedPassword, grupa_wiekowa });
-//     const token = jwt.sign({ id: newUser.id }, JWT_SECRET, { expiresIn: '1h' });
-//     res.json({ token });
-//   } catch (error) {
-//     res.status(500).json({ error: 'Rejestracja nie powiodła się' });
-//   }
-// });
 router.post('/auth/register', async (req, res) => {
   try {
     const { email, haslo, grupa_wiekowa } = req.body;
 
-    // Sprawdź, czy wszystkie wymagane pola są obecne
     if (!email || !haslo || !grupa_wiekowa) {
       return res.status(400).json({ error: 'Wszystkie pola są wymagane.' });
     }
 
-    // Sprawdź, czy użytkownik już istnieje
+    // czy użytkownik już istnieje
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
       return res.status(400).json({ error: 'Użytkownik o tym adresie email już istnieje.' });
@@ -158,7 +146,7 @@ router.get('/places/:place_id', async (req, res) => {
 
 router.get('/places/available', async (req, res) => {
   const { dyscyplina, godzina, czas_trwania } = req.query;
-  // Implementacja logiki pobierania dostępnych miejsc
+  // TO DO miejsca dostępne 
   res.json([]);
 });
 

@@ -9,7 +9,7 @@ app.use(express.json());
 app.use(routes);
 
 // Synchronizacja z bazą danych
-sequelize.sync({ force: false }) // Ustawienie force: false zapobiega nadpisywaniu istniejących danych
+sequelize.sync({ force: false }) 
   .then(() => {
     console.log('Baza danych zsynchronizowana');
     app.listen(3000, () => {
