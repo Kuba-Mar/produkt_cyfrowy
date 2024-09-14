@@ -2,11 +2,18 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { Sequelize, Op } = require('sequelize'); 
 const { User, Event, Place } = require('../models');
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 const JWT_SECRET = 'your_jwt_secret_key';
+
+// Funkcja pomocnicza do sprawdzenia poprawności UUID
+function isValidUUID(uuid) {
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(uuid);
+}
+
 
 // --- Auth Endpoints ---
 router.post('/auth/register', async (req, res) => {
@@ -66,13 +73,26 @@ router.post('/auth/refresh', (req, res) => {
 // --- Events Endpoints ---
 router.get('/events/:event_id', authenticateToken, async (req, res) => {
   try {
-    const event = await Event.findByPk(req.params.event_id);
-    if (!event) return res.status(404).json({ error: 'Wydarzenie nie znalezione' });
+
+    const eventId = req.params.event_id.trim();
+
+    if (!/^[0-9a-fA-F-]{36}$/.test(eventId)) {
+      return res.status(400).json({ error: 'Nieprawidłowy format UUID' });
+    }
+
+    // Znajdź wydarzenie po ID
+    const event = await Event.findByPk(eventId);
+    if (!event) {
+      return res.status(404).json({ error: 'Wydarzenie nie znalezione' });
+    }
+
     res.json(event);
   } catch (error) {
+    console.error('Błąd pobierania wydarzenia:', error);
     res.status(500).json({ error: 'Błąd pobierania wydarzenia' });
   }
 });
+
 
 // router.post('/events/create', authenticateToken, async (req, res) => {
 //   try {
@@ -150,19 +170,91 @@ router.post('/events/leave/:event_id', authenticateToken, async (req, res) => {
 // --- Places Endpoints ---
 router.get('/places/:place_id', async (req, res) => {
   try {
-    const place = await Place.findByPk(req.params.place_id);
-    if (!place) return res.status(404).json({ error: 'Miejsce nie znalezione' });
+    const placeId = req.params.place_id;
+
+    if (!/^[0-9a-fA-F-]{36}$/.test(placeId)) {
+      return res.status(400).json({ error: 'Nieprawidłowy format UUID' });
+    }
+
+    // Miejsce po ID
+    const place = await Place.findByPk(placeId);
+    if (!place) {
+      return res.status(404).json({ error: 'Miejsce nie znalezione' });
+    }
+
     res.json(place);
   } catch (error) {
+    console.error('Błąd pobierania miejsca:', error);
     res.status(500).json({ error: 'Błąd pobierania miejsca' });
   }
 });
 
+// Endpoint do pobierania dostępnych miejsc dla danej godziny, długości i dyscypliny
 router.get('/places/available', async (req, res) => {
   const { dyscyplina, godzina, czas_trwania } = req.query;
-  // TO DO miejsca dostępne 
-  res.json([]);
+
+  try {
+    // Sprawdzenie poprawności parametrów wejściowych
+    if (!dyscyplina || !godzina || !czas_trwania) {
+      return res.status(400).json({ error: 'Brak wymaganych parametrów.' });
+    }
+
+    // Konwersja godziny na format Date
+    const startTime = new Date(godzina);
+
+    // Sprawdzenie poprawności daty
+    if (isNaN(startTime)) {
+      return res.status(400).json({ error: 'Nieprawidłowy format godziny.' });
+    }
+
+    const endTime = new Date(startTime);
+    endTime.setMinutes(endTime.getMinutes() + parseInt(czas_trwania, 10));
+
+    // Pobranie miejsc zgodnych z parametrami
+    const places = await Place.findAll({
+      where: {
+        dyscyplina
+      }
+    });
+
+    // Filtracja dostępnych miejsc
+    const availablePlaces = [];
+
+    for (const place of places) {
+      const conflictingEvents = await Event.findOne({
+        where: {
+          id_miejsca: place.id,
+          [Op.or]: [
+            {
+              data_rozpoczecia: {
+                [Op.between]: [startTime, endTime],
+              },
+            },
+            {
+              data_rozpoczecia: {
+                [Op.lt]: startTime,
+              },
+              czas_trwania: {
+                [Op.gt]: Sequelize.literal(`EXTRACT(EPOCH FROM (timestamp '${startTime.toISOString()}' - data_rozpoczecia)) / 60`),
+              },
+            },
+          ],
+        },
+      });
+
+      if (!conflictingEvents) {
+        availablePlaces.push(place);
+      }
+    }
+
+    res.json(availablePlaces);
+
+  } catch (error) {
+    console.error('Błąd pobierania dostępnych miejsc:', error);
+    res.status(500).json({ error: 'Błąd pobierania dostępnych miejsc' });
+  }
 });
+
 
 // --- User Endpoints ---
 router.get('/users/:user_id/created_events', authenticateToken, async (req, res) => {
