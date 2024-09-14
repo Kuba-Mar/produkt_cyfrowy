@@ -113,11 +113,25 @@ router.post('/events/create', authenticateToken, async (req, res) => {
 
 router.post('/events/join/:event_id', authenticateToken, async (req, res) => {
   try {
-    const event = await Event.findByPk(req.params.event_id);
-    if (!event) return res.status(404).json({ error: 'Wydarzenie nie znalezione' });
-    await event.addUser(req.user.id);
+    const eventId = req.params.event_id;
+    const userId = req.user.id; // Użytkownik jest uwierzytelniony, więc powinien mieć swoje ID w żądaniu
+
+    const event = await Event.findByPk(eventId);
+    if (!event) {
+      return res.status(404).json({ error: 'Wydarzenie nie znalezione' });
+    }
+
+    // Czy użytkownik jest już uczestnikiem wydarzenia
+    const isUserAlreadyParticipant = await event.hasUser(userId);
+    if (isUserAlreadyParticipant) {
+      return res.status(400).json({ error: 'Użytkownik już dołączył do wydarzenia' });
+    }
+
+    await event.addUser(userId);
+
     res.sendStatus(200);
   } catch (error) {
+    console.error('Błąd podczas dołączania do wydarzenia:', error);
     res.status(500).json({ error: 'Błąd podczas dołączania do wydarzenia' });
   }
 });

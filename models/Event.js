@@ -45,7 +45,7 @@ const Event = sequelize.define('Event', {
     allowNull: false,
   }
 }, {
-  timestamps: false // Wyłączenie timestamps
+  timestamps: true // Wyłączenie timestamps
 });
 
 // Relacje
