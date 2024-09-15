@@ -6,11 +6,11 @@ require('dotenv').config(); // Wczytaj zmienne środowiskowe z pliku .env
 const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialect: 'postgres',
   protocol: 'postgres',
-  logging: false, // Wyłącz logowanie SQL
+  logging: false, 
   dialectOptions: {
     ssl: {
       require: true, // Wymagane połączenie SSL
-      rejectUnauthorized: false, // Wyłączenie sprawdzania certyfikatu SSL (może być wymagane w Railway)
+      rejectUnauthorized: false, 
     },
   },
 });

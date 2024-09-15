@@ -1,0 +1,6 @@
+# Ignoruj foldery
+node_modules/
+
+# Ignoruj pliki tymczasowe
+*.log
+*.tmp

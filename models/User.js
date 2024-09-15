@@ -25,7 +25,7 @@ const User = sequelize.define('User', {
     allowNull: false,
   }
 }, {
-  timestamps: true, // timestamp wyłączony 
+  timestamps: true, 
 });
 
 module.exports = User;

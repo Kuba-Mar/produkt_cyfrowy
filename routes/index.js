@@ -228,7 +228,7 @@ router.get('/places/available', async (req, res) => {
       // Sprawdzenie, czy UUID jest prawidłowy
       if (!isUuid(place.id)) {
         console.error('Nieprawidłowy UUID miejsca:', place.id);
-        continue;
+        continue; // Pomijamy miejsca z niepoprawnym UUID
       }
 
       // Pobranie wydarzeń kolidujących z danym miejscem
