@@ -14,6 +14,7 @@ function isValidUUID(uuid) {
   return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(uuid);
 }
 
+const { validate: isUuid } = require('uuid');
 
 // --- Auth Endpoints ---
 router.post('/auth/register', async (req, res) => {
@@ -203,10 +204,11 @@ router.get('/places/available', async (req, res) => {
     const startTime = new Date(godzina);
 
     // Sprawdzenie poprawności daty
-    if (isNaN(startTime)) {
+    if (isNaN(startTime.getTime())) {
       return res.status(400).json({ error: 'Nieprawidłowy format godziny.' });
     }
 
+    // Obliczenie końca wydarzenia
     const endTime = new Date(startTime);
     endTime.setMinutes(endTime.getMinutes() + parseInt(czas_trwania, 10));
 
@@ -217,10 +219,19 @@ router.get('/places/available', async (req, res) => {
       }
     });
 
-    // Filtracja dostępnych miejsc
     const availablePlaces = [];
 
     for (const place of places) {
+      // Debugowanie UUID miejsca
+      console.log('Sprawdzanie miejsca o ID:', place.id);
+
+      // Sprawdzenie, czy UUID jest prawidłowy
+      if (!isUuid(place.id)) {
+        console.error('Nieprawidłowy UUID miejsca:', place.id);
+        continue;
+      }
+
+      // Pobranie wydarzeń kolidujących z danym miejscem
       const conflictingEvents = await Event.findOne({
         where: {
           id_miejsca: place.id,
@@ -234,14 +245,20 @@ router.get('/places/available', async (req, res) => {
               data_rozpoczecia: {
                 [Op.lt]: startTime,
               },
-              czas_trwania: {
-                [Op.gt]: Sequelize.literal(`EXTRACT(EPOCH FROM (timestamp '${startTime.toISOString()}' - data_rozpoczecia)) / 60`),
-              },
+              [Op.and]: Sequelize.where(
+                Sequelize.literal(
+                  `EXTRACT(EPOCH FROM (timestamp '${startTime.toISOString()}' - data_rozpoczecia)) / 60`
+                ),
+                {
+                  [Op.gt]: Sequelize.col('czas_trwania'),
+                }
+              ),
             },
           ],
         },
       });
 
+      // Dodanie miejsca do listy, jeśli brak konfliktu
       if (!conflictingEvents) {
         availablePlaces.push(place);
       }
@@ -254,6 +271,7 @@ router.get('/places/available', async (req, res) => {
     res.status(500).json({ error: 'Błąd pobierania dostępnych miejsc' });
   }
 });
+
 
 
 // --- User Endpoints ---

@@ -1,14 +1,21 @@
 // config/database.js
 const { Sequelize } = require('sequelize');
-require('dotenv').config();
+require('dotenv').config(); // Wczytaj zmienne środowiskowe z pliku .env
 
-const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASS, {
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
+// Użycie URL połączenia z pliku .env
+const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialect: 'postgres',
-  logging: false,
+  protocol: 'postgres',
+  logging: false, // Wyłącz logowanie SQL
+  dialectOptions: {
+    ssl: {
+      require: true, // Wymagane połączenie SSL
+      rejectUnauthorized: false, // Wyłączenie sprawdzania certyfikatu SSL (może być wymagane w Railway)
+    },
+  },
 });
 
+// Testowanie połączenia
 sequelize.authenticate()
   .then(() => {
     console.log('Połączenie z bazą danych zostało nawiązane.');
@@ -16,6 +23,5 @@ sequelize.authenticate()
   .catch(err => {
     console.error('Błąd podczas łączenia z bazą danych:', err);
   });
-
 
 module.exports = sequelize;

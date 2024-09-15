@@ -1,10 +1,19 @@
 // server.js
 const express = require('express');
+const cors = require('cors'); // Import CORS
 const sequelize = require('./config/database');
 const routes = require('./routes/index');
 
 const app = express();
 
+// Użycie middleware CORS
+app.use(cors({
+  origin: 'http://localhost:3000', 
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], 
+  credentials: false 
+}));
+
+// Middleware do obsługi JSON
 app.use(express.json());
 app.use(routes);
 
