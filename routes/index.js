@@ -169,6 +169,171 @@ router.post('/events/leave/:event_id', authenticateToken, async (req, res) => {
 });
 
 // --- Places Endpoints ---
+// Endpoint do pobierania dostępnych miejsc dla danej godziny, długości i dyscypliny
+// router.get('/places/available', async (req, res) => {
+//   const { dyscyplina, godzina, czas_trwania } = req.query;
+
+//   try {
+//     // Sprawdzenie poprawności parametrów wejściowych
+//     if (!dyscyplina || !godzina || !czas_trwania) {
+//       return res.status(400).json({ error: 'Brak wymaganych parametrów.' });
+//     }
+
+//     // Konwersja godziny na format Date
+//     const startTime = new Date(godzina);
+
+//     // Sprawdzenie poprawności daty
+//     if (isNaN(startTime.getTime())) {
+//       return res.status(400).json({ error: 'Nieprawidłowy format godziny.' });
+//     }
+
+//     // Obliczenie końca wydarzenia
+//     const endTime = new Date(startTime);
+//     endTime.setMinutes(endTime.getMinutes() + parseInt(czas_trwania, 10));
+
+//     // Pobranie miejsc zgodnych z parametrami
+//     const places = await Place.findAll({
+//       where: {
+//         dyscyplina
+//       }
+//     });
+
+//     const availablePlaces = [];
+
+//     for (const place of places) {
+//       // Debugowanie UUID miejsca
+//       console.log('Sprawdzanie miejsca o ID:', place.id);
+
+//       // Sprawdzenie, czy UUID jest prawidłowy
+//       if (!isUuid(place.id)) {
+//         console.error('Nieprawidłowy UUID miejsca:', place.id);
+//         continue; // Pomijamy miejsca z niepoprawnym UUID
+//       }
+
+//       // Pobranie wydarzeń kolidujących z danym miejscem
+//       const conflictingEvents = await Event.findOne({
+//         where: {
+//           id_miejsca: place.id,
+//           [Op.or]: [
+//             {
+//               data_rozpoczecia: {
+//                 [Op.between]: [startTime, endTime],
+//               },
+//             },
+//             {
+//               data_rozpoczecia: {
+//                 [Op.lt]: startTime,
+//               },
+//               [Op.and]: Sequelize.where(
+//                 Sequelize.literal(
+//                   `EXTRACT(EPOCH FROM (timestamp '${startTime.toISOString()}' - data_rozpoczecia)) / 60`
+//                 ),
+//                 {
+//                   [Op.gt]: Sequelize.col('czas_trwania'),
+//                 }
+//               ),
+//             },
+//           ],
+//         },
+//       });
+
+//       // Dodanie miejsca do listy, jeśli brak konfliktu
+//       if (!conflictingEvents) {
+//         availablePlaces.push(place);
+//       }
+//     }
+
+//     res.json(availablePlaces);
+
+//   } catch (error) {
+//     console.error('Błąd pobierania dostępnych miejsc:', error);
+//     res.status(500).json({ error: 'Błąd pobierania dostępnych miejsc' });
+//   }
+// });
+router.get('/places/available', async (req, res) => {
+  const { dyscyplina, godzina, czas_trwania } = req.query;
+
+  try {
+    console.log('Otrzymane zapytanie:', req.query); 
+
+    // Sprawdzenie poprawności parametrów wejściowych
+    if (!dyscyplina || !godzina || !czas_trwania) {
+      return res.status(400).json({ error: 'Brak wymaganych parametrów.' }); 
+    }
+
+    // Konwersja godziny na format Date
+    const startTime = new Date(godzina);
+    console.log('Początkowy czas:', startTime);
+
+    // Sprawdzenie poprawności daty
+    if (isNaN(startTime.getTime())) {
+      console.log('Nieprawidłowy format godziny:', godzina); 
+      return res.status(400).json({ error: 'Nieprawidłowy format godziny.' });
+    }
+
+    // Obliczenie końca wydarzenia
+    const endTime = new Date(startTime);
+    endTime.setMinutes(endTime.getMinutes() + parseInt(czas_trwania, 10));
+    console.log('Koniec czasu:', endTime);
+
+    // Pobranie miejsc zgodnych z parametrami
+    const places = await Place.findAll({
+      where: {
+        dyscyplina
+      }
+    });
+    console.log('Znalezione miejsca:', places.length);
+
+    const availablePlaces = [];
+
+    for (const place of places) {
+      console.log('Sprawdzanie miejsca o ID:', place.id);
+
+      const conflictingEvents = await Event.findOne({
+        where: {
+          id_miejsca: place.id,
+          [Op.and]: [
+            // Wydarzenie zaczyna się przed końcem wyszukiwanego okresu i kończy się po rozpoczęciu wyszukiwanego okresu
+            {
+              data_rozpoczecia: {
+                [Op.lt]: endTime, // Wydarzenie zaczyna się przed końcem wyszukiwanego okresu
+              },
+            },
+            Sequelize.where(
+              Sequelize.literal(
+                `data_rozpoczecia + (czas_trwania * INTERVAL '1 minute')`
+              ),
+              {
+                [Op.gt]: startTime, // Wydarzenie kończy się po rozpoczęciu wyszukiwanego okresu
+              }
+            ),
+          ],
+        },
+      });
+
+      console.log(`Dla miejsca ${place.id} znaleziono konfliktujące wydarzenia:`, conflictingEvents);
+
+      // Dodanie miejsca do listy, jeśli brak konfliktu
+      if (!conflictingEvents) {
+        console.log('Miejsce dodane do dostępnych:', place.id);
+        availablePlaces.push(place);
+      }
+    }
+
+    console.log('Dostępne miejsca:', availablePlaces);
+
+    res.json(availablePlaces);
+
+  } catch (error) {
+    console.error('Błąd pobierania dostępnych miejsc:', error);
+    res.status(500).json({ error: 'Błąd pobierania dostępnych miejsc' });
+  }
+});
+
+
+
+
+
 router.get('/places/:place_id', async (req, res) => {
   try {
     const placeId = req.params.place_id;
@@ -190,87 +355,6 @@ router.get('/places/:place_id', async (req, res) => {
   }
 });
 
-// Endpoint do pobierania dostępnych miejsc dla danej godziny, długości i dyscypliny
-router.get('/places/available', async (req, res) => {
-  const { dyscyplina, godzina, czas_trwania } = req.query;
-
-  try {
-    // Sprawdzenie poprawności parametrów wejściowych
-    if (!dyscyplina || !godzina || !czas_trwania) {
-      return res.status(400).json({ error: 'Brak wymaganych parametrów.' });
-    }
-
-    // Konwersja godziny na format Date
-    const startTime = new Date(godzina);
-
-    // Sprawdzenie poprawności daty
-    if (isNaN(startTime.getTime())) {
-      return res.status(400).json({ error: 'Nieprawidłowy format godziny.' });
-    }
-
-    // Obliczenie końca wydarzenia
-    const endTime = new Date(startTime);
-    endTime.setMinutes(endTime.getMinutes() + parseInt(czas_trwania, 10));
-
-    // Pobranie miejsc zgodnych z parametrami
-    const places = await Place.findAll({
-      where: {
-        dyscyplina
-      }
-    });
-
-    const availablePlaces = [];
-
-    for (const place of places) {
-      // Debugowanie UUID miejsca
-      console.log('Sprawdzanie miejsca o ID:', place.id);
-
-      // Sprawdzenie, czy UUID jest prawidłowy
-      if (!isUuid(place.id)) {
-        console.error('Nieprawidłowy UUID miejsca:', place.id);
-        continue; // Pomijamy miejsca z niepoprawnym UUID
-      }
-
-      // Pobranie wydarzeń kolidujących z danym miejscem
-      const conflictingEvents = await Event.findOne({
-        where: {
-          id_miejsca: place.id,
-          [Op.or]: [
-            {
-              data_rozpoczecia: {
-                [Op.between]: [startTime, endTime],
-              },
-            },
-            {
-              data_rozpoczecia: {
-                [Op.lt]: startTime,
-              },
-              [Op.and]: Sequelize.where(
-                Sequelize.literal(
-                  `EXTRACT(EPOCH FROM (timestamp '${startTime.toISOString()}' - data_rozpoczecia)) / 60`
-                ),
-                {
-                  [Op.gt]: Sequelize.col('czas_trwania'),
-                }
-              ),
-            },
-          ],
-        },
-      });
-
-      // Dodanie miejsca do listy, jeśli brak konfliktu
-      if (!conflictingEvents) {
-        availablePlaces.push(place);
-      }
-    }
-
-    res.json(availablePlaces);
-
-  } catch (error) {
-    console.error('Błąd pobierania dostępnych miejsc:', error);
-    res.status(500).json({ error: 'Błąd pobierania dostępnych miejsc' });
-  }
-});
 
 
 
